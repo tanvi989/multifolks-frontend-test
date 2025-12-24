@@ -1,0 +1,34 @@
+{
+  "name": "multifolks-clone",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite preview --port 3000 --host"
+  },
+  "dependencies": {
+    "@stripe/react-stripe-js": "^3.5.0",
+    "@stripe/stripe-js": "^3.5.0",
+    "@tanstack/react-query": "5.66.0",
+    "axios": "1.7.9",
+    "formik": "2.4.5",
+    "lucide-react": "^0.555.0",
+    "moment": "2.30.1",
+    "mongoose": "^9.0.2",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-otp-input": "3.1.1",
+    "react-player": "2.16.0",
+    "react-router-dom": "7.1.5",
+    "yup": "1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

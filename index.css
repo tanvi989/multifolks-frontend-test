@@ -1,0 +1,137 @@
+/* ===============================
+   1. Font-face declarations
+   =============================== */
+@font-face {
+  font-family: "Lynstone";
+  src: url("/LynstoneWeb_Light.woff2") format("woff2"),
+    url("/LynstoneWeb_Light.woff") format("woff");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lynstone";
+  src: url("/LynstoneWeb-Book.woff2") format("woff2"),
+    url("/LynstoneWeb-Book.woff") format("woff");
+  font-weight: 400; /* Book = regular weight */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lynstone";
+  src: url("/LynstoneWeb-Regular.woff2") format("woff2"),
+    url("/LynstoneWeb-Regular.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lynstone";
+  src: url("/LynstoneWeb-SemiBold.woff2") format("woff2"),
+    url("/LynstoneWeb-SemiBold.woff") format("woff");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ===============================
+   2. CSS Variables
+   =============================== */
+:root {
+  --font-lynstone-book: "Lynstone", system-ui, -apple-system, sans-serif;
+  --font-lynstone-semi: "Lynstone", system-ui, -apple-system, sans-serif;
+}
+
+/* ===============================
+   3. Base typography
+   =============================== */
+body {
+  background-color: #f3f0e7;
+  color: #1f1f1f;
+  font-family: var(
+    --font-lynstone-book
+  ); /* ← You wanted Lynstone-Book for body text */
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings → SemiBold */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-lynstone-semi) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+}
+
+h3,
+h2,
+p,
+li,
+span,
+div,
+a {
+  font-family: var(--font-lynstone-book) !important;
+  font-weight: 400;
+}
+
+/* Utility classes (optional but handy) */
+.font-book {
+  font-family: var(--font-lynstone-book) !important;
+}
+.font-semi {
+  font-family: var(--font-lynstone-semi) !important;
+  font-weight: 600 !important;
+}
+
+/* ===============================
+   6. Custom Scrollbar (unchanged)
+   =============================== */
+::-webkit-scrollbar {
+  width: 12px;
+}
+::-webkit-scrollbar-track {
+  background: #f3f0e7;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #d96c47;
+  border: 3px solid #f3f0e7;
+  border-radius: 20px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #bf5630;
+}
+
+::selection {
+  background-color: #d96c47;
+  color: white;
+}
+
+footer {
+  font-family: var(--font-lynstone-book) !important;
+}
+
+/* ===============================
+   7. Toast Animation
+   =============================== */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
