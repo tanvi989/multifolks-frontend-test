@@ -11,7 +11,7 @@ const store = {
 const error = (message: string) => ({ type: 'ERROR', payload: message });
 const success = (message: string) => ({ type: 'SUCCESS', payload: message });
 
-export const API_BASE_URL = "https://mvp.multifolks.com";  // Production
+export const API_BASE_URL = "http://82.112.238.249:5000";  // Production
 // export const API_BASE_URL = "http://localhost:5000";  // Local for testing
 
 const axios = Axios.create({
