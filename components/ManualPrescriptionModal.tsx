@@ -5,12 +5,14 @@ interface ManualPrescriptionModalProps {
     open: boolean;
     onClose: () => void;
     prescription: any;
+    onRemove?: () => void;
 }
 
 const ManualPrescriptionModal: React.FC<ManualPrescriptionModalProps> = ({
     open,
     onClose,
     prescription,
+    onRemove,
 }) => {
     if (!open || !prescription) return null;
 
@@ -292,13 +294,28 @@ const ManualPrescriptionModal: React.FC<ManualPrescriptionModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-2 bg-[#025048] text-white rounded-lg font-bold hover:bg-[#013b35] transition-colors"
-                    >
-                        Close
-                    </button>
+                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center">
+                    {onRemove && (
+                        <button
+                            onClick={() => {
+                                if (window.confirm("Are you sure you want to remove this prescription?")) {
+                                    onRemove();
+                                    onClose();
+                                }
+                            }}
+                            className="px-6 py-2 bg-[#E53935] text-white rounded-lg font-bold hover:bg-[#D32F2F] transition-colors"
+                        >
+                            Remove Prescription
+                        </button>
+                    )}
+                    <div className={onRemove ? "ml-auto" : ""}>
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2 bg-[#025048] text-white rounded-lg font-bold hover:bg-[#013b35] transition-colors"
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

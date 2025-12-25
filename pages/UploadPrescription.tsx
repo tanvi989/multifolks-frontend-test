@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import CheckoutStepper from "../components/CheckoutStepper";
 import { saveMyPrescription, uploadPrescriptionImage } from "../api/retailerApis";
 import PrescriptionHelpModal from "../components/PrescriptionHelpModal";
@@ -8,6 +9,7 @@ const UploadPrescription: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { state } = useLocation();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -213,18 +215,82 @@ const UploadPrescription: React.FC = () => {
             // Step 3: Save to backend for logged-in users
             if (isLoggedIn) {
                 try {
-                    await saveMyPrescription(
-                        "upload",
-                        {
-                            ...pdData,
-                            fileName: selectedFile.name,
-                            associatedProduct: prescriptionPayload.associatedProduct
-                        },
-                        "Uploaded Prescription",
-                        imageUrl,
-                        undefined
-                    );
-                    console.log("✓ Prescription saved to backend");
+                    // If updating from cart, try to find and update existing prescription
+                    if (cartItemId) {
+                        // First, try to get existing prescriptions to find the one to update
+                        const { getMyPrescriptions, updateMyPrescription } = await import('../api/retailerApis');
+                        try {
+                            const existingPrescriptions = await getMyPrescriptions();
+                            const prescriptions = existingPrescriptions?.data?.data || [];
+                            const existingPrescription = prescriptions.find((p: any) => {
+                                const pCartId = p?.data?.associatedProduct?.cartId || p?.associatedProduct?.cartId;
+                                return pCartId && String(pCartId) === String(cartItemId);
+                            });
+                            
+                            if (existingPrescription && (existingPrescription.id || existingPrescription._id)) {
+                                // For now, we'll create a new prescription and the old one can be cleaned up later
+                                // The backend update API may not support full prescription updates
+                                // So we create a new one which will be the latest
+                                await saveMyPrescription(
+                                    "upload",
+                                    {
+                                        ...pdData,
+                                        fileName: selectedFile.name,
+                                        associatedProduct: prescriptionPayload.associatedProduct
+                                    },
+                                    "Uploaded Prescription",
+                                    imageUrl,
+                                    undefined
+                                );
+                                console.log("✓ Created new prescription in backend (replacing old for cartId):", cartItemId);
+                            } else {
+                                // Create new prescription
+                                await saveMyPrescription(
+                                    "upload",
+                                    {
+                                        ...pdData,
+                                        fileName: selectedFile.name,
+                                        associatedProduct: prescriptionPayload.associatedProduct
+                                    },
+                                    "Uploaded Prescription",
+                                    imageUrl,
+                                    undefined
+                                );
+                                console.log("✓ Created new prescription in backend for cartId:", cartItemId);
+                            }
+                        } catch (updateError) {
+                            console.warn("Could not update existing prescription, creating new one:", updateError);
+                            // Fallback to creating new prescription
+                            await saveMyPrescription(
+                                "upload",
+                                {
+                                    ...pdData,
+                                    fileName: selectedFile.name,
+                                    associatedProduct: prescriptionPayload.associatedProduct
+                                },
+                                "Uploaded Prescription",
+                                imageUrl,
+                                undefined
+                            );
+                            console.log("✓ Prescription saved to backend");
+                        }
+                    } else {
+                        // Create new prescription (product page flow)
+                        await saveMyPrescription(
+                            "upload",
+                            {
+                                ...pdData,
+                                fileName: selectedFile.name,
+                                associatedProduct: prescriptionPayload.associatedProduct
+                            },
+                            "Uploaded Prescription",
+                            imageUrl,
+                            undefined
+                        );
+                        console.log("✓ Prescription saved to backend");
+                    }
+                    // Invalidate prescriptions query to refresh the data
+                    queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
                 } catch (error) {
                     console.error("❌ Failed to save to backend:", error);
                 }
@@ -232,9 +298,43 @@ const UploadPrescription: React.FC = () => {
 
             // Step 4: Save to localStorage for all users
             const savedPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
-            savedPrescriptions.push(prescriptionPayload);
+            
+            if (cartItemId) {
+                // Replace existing prescription for this cart item
+                const existingIndex = savedPrescriptions.findIndex((p: any) => 
+                    p?.associatedProduct?.cartId && String(p.associatedProduct.cartId) === String(cartItemId)
+                );
+                
+                if (existingIndex >= 0) {
+                    // Replace existing prescription
+                    savedPrescriptions[existingIndex] = prescriptionPayload;
+                    console.log("✓ Replaced existing prescription in localStorage for cartId:", cartItemId);
+                } else {
+                    // Add new prescription
+                    savedPrescriptions.push(prescriptionPayload);
+                    console.log("✓ Added new prescription to localStorage for cartId:", cartItemId);
+                }
+            } else {
+                // Add new prescription (product page flow)
+                savedPrescriptions.push(prescriptionPayload);
+                console.log("✓ Added new prescription to localStorage");
+            }
+            
             localStorage.setItem('prescriptions', JSON.stringify(savedPrescriptions));
-            console.log("✓ Prescription saved to localStorage with cart association");
+
+            // Step 5: Also save to session storage with product SKU for product page flow
+            if (!cartItemId && id) {
+                const sessionPrescriptions = JSON.parse(sessionStorage.getItem('productPrescriptions') || '{}');
+                sessionPrescriptions[id] = prescriptionPayload;
+                sessionStorage.setItem('productPrescriptions', JSON.stringify(sessionPrescriptions));
+                console.log("✓ Prescription saved to SessionStorage with product SKU:", id);
+            } else if (cartItemId && id) {
+                // Also update session storage when coming from cart
+                const sessionPrescriptions = JSON.parse(sessionStorage.getItem('productPrescriptions') || '{}');
+                sessionPrescriptions[id] = prescriptionPayload;
+                sessionStorage.setItem('productPrescriptions', JSON.stringify(sessionPrescriptions));
+                console.log("✓ Updated SessionStorage with product SKU:", id);
+            }
 
             setLoading(false);
 

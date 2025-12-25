@@ -246,6 +246,33 @@ const SelectLensType: React.FC = () => {
           priceValue: 0, // Set coating price to 0 as this page only selects the lens package
         });
 
+        // Check session storage for product-based prescriptions
+        const sessionPrescriptions = JSON.parse(sessionStorage.getItem('productPrescriptions') || '{}');
+        const productPrescription = sessionPrescriptions[product.skuid];
+        
+        if (productPrescription) {
+          // Link the prescription to the cart item
+          if (productPrescription.associatedProduct) {
+            productPrescription.associatedProduct.cartId = String(cartId);
+            // Update session storage
+            sessionPrescriptions[product.skuid] = productPrescription;
+            sessionStorage.setItem('productPrescriptions', JSON.stringify(sessionPrescriptions));
+            
+            // Also update localStorage
+            const localPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
+            const localIndex = localPrescriptions.findIndex((p: any) => 
+              p._id === productPrescription._id || 
+              (p.associatedProduct?.productSku === product.skuid && !p.associatedProduct?.cartId)
+            );
+            if (localIndex >= 0) {
+              localPrescriptions[localIndex].associatedProduct.cartId = String(cartId);
+              localStorage.setItem('prescriptions', JSON.stringify(localPrescriptions));
+            }
+            
+            console.log("✅ Linked product prescription to cartId:", cartId);
+          }
+        }
+
         if (state?.prescriptionMethod === "manual" && state?.prescriptionData) {
           const customerID = localStorage.getItem("customerID") || "guest";
           await addPrescription(

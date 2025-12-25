@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Formik, Form, FormikProps } from "formik";
 import * as Yup from "yup";
+import { useQueryClient } from "@tanstack/react-query";
 import CheckoutStepper from "../components/CheckoutStepper";
 import SelectField from "../components/SelectField";
 import InputField from "../components/InputField";
@@ -93,7 +94,7 @@ const ManualPrescription: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { state } = useLocation();
   const navigate = useNavigate();
-
+  const queryClient = useQueryClient();
 
   const [searchParams] = useSearchParams();
 
@@ -196,6 +197,7 @@ const ManualPrescription: React.FC = () => {
     // Generate a unique ID for this specific prescription/product pairing
     const uniqueId = `pres_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const cartItemId = searchParams.get("cart_id");
+    console.log("📝 [ManualPrescription] Saving prescription with cartId:", cartItemId);
 
     // Construct the payload matching the schema
     const payload = {
@@ -259,18 +261,28 @@ const ManualPrescription: React.FC = () => {
 
       // 1. Save to Backend if logged in
       if (isLoggedIn) {
-        console.log("📡 Saving Manual Prescription to Backend...", payload);
+        console.log("📡 [ManualPrescription] Saving Manual Prescription to Backend...", JSON.stringify(payload, null, 2));
+        const savePayload = {
+          ...payload.prescriptionDetails,
+          associatedProduct: payload.associatedProduct // Include associated product info
+        };
+        console.log("📡 [ManualPrescription] Save payload structure:", JSON.stringify(savePayload, null, 2));
+        
+        // If updating from cart, the localStorage replacement handles it
+        // Backend will create a new prescription (old ones can be cleaned up later)
+        // The cart will show the latest prescription based on localStorage
         await saveMyPrescription(
           "manual",
-          {
-            ...payload.prescriptionDetails,
-            associatedProduct: payload.associatedProduct // Include associated product info
-          },
+          savePayload,
           "Manual Prescription",
           undefined, // No image URL for manual
           undefined  // guestId handled by API wrapper usually or passed if needed
         );
-        console.log("✅ Saved to Backend");
+        console.log("✅ [ManualPrescription] Saved to Backend");
+        // Invalidate prescriptions query to refresh the data
+        queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+        // Wait a bit for the backend to process
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       // 2. Save to Local Storage (Mirror UploadPrescription behavior)
@@ -279,9 +291,41 @@ const ManualPrescription: React.FC = () => {
       // adapting payload to match what UploadPrescription likely saves or what Schema defines.
       // The schema defined in md was flat, but let's adhere to the structure constructed above.
 
-      savedPrescriptions.push(payload);
+      if (cartItemId) {
+        // Replace existing prescription for this cart item
+        const existingIndex = savedPrescriptions.findIndex((p: any) => 
+          p?.associatedProduct?.cartId && String(p.associatedProduct.cartId) === String(cartItemId)
+        );
+        
+        if (existingIndex >= 0) {
+          // Replace existing prescription
+          savedPrescriptions[existingIndex] = payload;
+          console.log("✅ Replaced existing prescription in localStorage for cartId:", cartItemId);
+        } else {
+          // Add new prescription
+          savedPrescriptions.push(payload);
+          console.log("✅ Added new prescription to localStorage for cartId:", cartItemId);
+        }
+      } else {
+        // Add new prescription (product page flow)
+        savedPrescriptions.push(payload);
+        console.log("✅ Added new prescription to localStorage");
+      }
+      
       localStorage.setItem('prescriptions', JSON.stringify(savedPrescriptions));
-      console.log("✅ Saved to LocalStorage");
+
+      // 3. Also save to session storage with product SKU for product page flow
+      const productSku = state?.product?.skuid || id;
+      if (productSku) {
+        const sessionPrescriptions = JSON.parse(sessionStorage.getItem('productPrescriptions') || '{}');
+        sessionPrescriptions[productSku] = payload;
+        sessionStorage.setItem('productPrescriptions', JSON.stringify(sessionPrescriptions));
+        if (cartItemId) {
+          console.log("✅ Updated SessionStorage with product SKU:", productSku);
+        } else {
+          console.log("✅ Saved to SessionStorage with product SKU:", productSku);
+        }
+      }
 
     } catch (error) {
       console.error("❌ Error saving manual prescription:", error);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CartItem } from "../../types";
 import {
     formatFrameSize,
@@ -10,6 +11,7 @@ import WhyMutlifolks from "../WhyMutlifolks";
 import CouponTermsDialog from "../product/CouponTermsDialog";
 import { Footer } from "../Footer";
 import ManualPrescriptionModal from "../ManualPrescriptionModal";
+import { deletePrescription, removePrescription, getMyPrescriptions } from "../../api/retailerApis";
 
 interface MobileCartProps {
     cartItems: CartItem[];
@@ -35,6 +37,8 @@ interface MobileCartProps {
     authData: { isAuthenticated: boolean; firstName: string };
     setShowLoginModal: (show: boolean) => void;
     userPrescriptions?: any[];
+    refetchPrescriptions?: () => void;
+    refetchCart?: () => void;
 }
 
 const MobileCart: React.FC<MobileCartProps> = ({
@@ -61,7 +65,10 @@ const MobileCart: React.FC<MobileCartProps> = ({
     authData,
     setShowLoginModal,
     userPrescriptions = [],
+    refetchPrescriptions,
+    refetchCart,
 }) => {
+    const queryClient = useQueryClient();
     const [shippingOpen, setShippingOpen] = useState(false);
     const [addressOpen, setAddressOpen] = useState(false);
     const [cartItemsOpen, setCartItemsOpen] = useState(false);
@@ -81,11 +88,23 @@ const MobileCart: React.FC<MobileCartProps> = ({
     // Helper function to get prescription from user's prescriptions array (database)
     const getPrescriptionByCartId = (cartId: number, cartItem?: CartItem): any | null => {
         try {
+            // Check if cart item already has prescription linked
+            if (cartItem?.prescription) {
+                console.log('✅ Found prescription on cart item (Mobile):', cartItem.prescription);
+                return cartItem.prescription;
+            }
+
             // Search user's prescriptions array from database
             if (userPrescriptions && userPrescriptions.length > 0) {
-                let prescription = userPrescriptions.find((p: any) =>
-                    p.associatedProduct?.cartId && String(p.associatedProduct.cartId) === String(cartId)
-                );
+                let prescription = userPrescriptions.find((p: any) => {
+                    // Check nested data.associatedProduct.cartId
+                    const dataCartId = p?.data?.associatedProduct?.cartId;
+                    // Check root level associatedProduct.cartId
+                    const rootCartId = p?.associatedProduct?.cartId;
+                    // Check if cartId matches
+                    return (dataCartId && String(dataCartId) === String(cartId)) ||
+                           (rootCartId && String(rootCartId) === String(cartId));
+                });
 
                 if (prescription) {
                     console.log('✅ Found prescription in user database (Mobile):', prescription);
@@ -93,10 +112,79 @@ const MobileCart: React.FC<MobileCartProps> = ({
                 }
             }
 
+            // Also check localStorage as fallback
+            try {
+                const localPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
+                const localPrescription = localPrescriptions.find((p: any) => {
+                    const pCartId = p?.associatedProduct?.cartId;
+                    return pCartId && String(pCartId) === String(cartId);
+                });
+                if (localPrescription) {
+                    console.log('✅ Found prescription in localStorage (Mobile):', localPrescription);
+                    return localPrescription;
+                }
+            } catch (e) {
+                console.error("Error checking localStorage prescriptions:", e);
+            }
+
             return null;
         } catch (error) {
             console.error("Error fetching prescription from user database:", error);
             return null;
+        }
+    };
+
+    // Handle remove prescription
+    const handleRemovePrescription = async (cartId: number, prescription: any) => {
+        if (!window.confirm("Are you sure you want to remove this prescription?")) {
+            return;
+        }
+
+        try {
+            // If prescription has an ID, delete it from database
+            if (prescription.id || prescription._id) {
+                const prescriptionId = prescription.id || prescription._id;
+                await deletePrescription(prescriptionId);
+                console.log("✅ Prescription deleted from database");
+            }
+
+            // Also remove from cart via API
+            try {
+                await removePrescription(cartId);
+                console.log("✅ Prescription removed from cart");
+            } catch (err) {
+                console.warn("Warning: Could not remove prescription from cart via API", err);
+            }
+
+            // Remove from localStorage
+            try {
+                const localPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
+                const filtered = localPrescriptions.filter((p: any) => {
+                    const pCartId = p?.associatedProduct?.cartId;
+                    return !pCartId || String(pCartId) !== String(cartId);
+                });
+                localStorage.setItem('prescriptions', JSON.stringify(filtered));
+                console.log("✅ Prescription removed from localStorage");
+            } catch (e) {
+                console.error("Error removing from localStorage:", e);
+            }
+
+            // Refresh prescriptions and cart
+            if (authData.isAuthenticated && refetchPrescriptions) {
+                refetchPrescriptions();
+            } else {
+                queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+            }
+            if (refetchCart) {
+                refetchCart();
+            }
+            setPrescriptionRefresh(prev => prev + 1);
+            setViewPrescription(null);
+
+            alert("Prescription removed successfully!");
+        } catch (error) {
+            console.error("Error removing prescription:", error);
+            alert("Failed to remove prescription. Please try again.");
         }
     };
 
@@ -258,24 +346,42 @@ const MobileCart: React.FC<MobileCartProps> = ({
                                             </p>
 
                                             {/* Show Prescription Button */}
-                                            <button
-                                                onClick={() => {
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const prescription = getPrescriptionByCartId(item.cart_id, item);
+                                                        if (prescription) {
+                                                            setViewPrescription(prescription);
+                                                        } else {
+                                                            // Redirect to manual prescription page with cart_id
+                                                            navigate(`/manual-prescription?cart_id=${item.cart_id}`);
+                                                        }
+                                                    }}
+                                                    className="bg-[#E94D37] hover:bg-[#bf3e2b] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors"
+                                                >
+                                                    {(() => {
+                                                        // Force re-evaluation when prescriptionRefresh changes
+                                                        const _ = prescriptionRefresh;
+                                                        return getPrescriptionByCartId(item.cart_id, item) ? 'Show Prescription' : 'Add Prescription';
+                                                    })()}
+                                                </button>
+                                                {(() => {
+                                                    const _ = prescriptionRefresh;
                                                     const prescription = getPrescriptionByCartId(item.cart_id, item);
                                                     if (prescription) {
-                                                        setViewPrescription(prescription);
-                                                    } else {
-                                                        // Redirect to manual prescription page with cart_id
-                                                        navigate(`/manual-prescription?cart_id=${item.cart_id}`);
+                                                        return (
+                                                            <button
+                                                                onClick={() => handleRemovePrescription(item.cart_id, prescription)}
+                                                                className="text-[#E53935] hover:text-[#D32F2F] text-[10px] font-bold underline transition-colors"
+                                                                title="Remove Prescription"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        );
                                                     }
-                                                }}
-                                                className="bg-[#E94D37] hover:bg-[#bf3e2b] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors"
-                                            >
-                                                {(() => {
-                                                    // Force re-evaluation when prescriptionRefresh changes
-                                                    const _ = prescriptionRefresh;
-                                                    return getPrescriptionByCartId(item.cart_id, item) ? 'Show Prescription' : 'Add Prescription';
+                                                    return null;
                                                 })()}
-                                            </button>
+                                            </div>
                                         </div>
 
                                         <div className="mt-4 flex items-center justify-between">
@@ -666,6 +772,15 @@ const MobileCart: React.FC<MobileCartProps> = ({
                 open={!!viewPrescription}
                 onClose={() => setViewPrescription(null)}
                 prescription={viewPrescription}
+                onRemove={viewPrescription ? () => {
+                    const cartItem = cartItems.find((item: CartItem) => {
+                        const prescription = getPrescriptionByCartId(item.cart_id, item);
+                        return prescription && (prescription.id === viewPrescription.id || prescription._id === viewPrescription._id);
+                    });
+                    if (cartItem) {
+                        handleRemovePrescription(cartItem.cart_id, viewPrescription);
+                    }
+                } : undefined}
             />
         </div >
     );
