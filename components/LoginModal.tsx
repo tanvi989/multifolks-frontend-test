@@ -268,8 +268,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                                     Proceed
                                 </button>
 
-                                {/* Request PIN and Forgot Password Links */}
-                                <div className="flex justify-between items-center -mt-2">
+                                {/* Request PIN Link Only - Removed Forgot Password */}
+                                <div className="flex justify-center items-center -mt-2">
                                     <button
                                         type="button"
                                         onClick={async () => {
@@ -288,25 +288,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                                         className="text-sm text-[#1F1F1F] hover:opacity-80 underline font-bold"
                                     >
                                         Request PIN?
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={async () => {
-                                            try {
-                                                setLoading(true);
-                                                setError("");
-                                                await authService.requestPin(email);
-                                                setStep("forgot_password");
-                                            } catch (err: any) {
-                                                console.error("Failed to send PIN:", err);
-                                                setError("Failed to send PIN. Please try again.");
-                                            } finally {
-                                                setLoading(false);
-                                            }
-                                        }}
-                                        className="text-sm text-[#1F1F1F] hover:opacity-80 underline font-bold"
-                                    >
-                                        Forgot Password?
                                     </button>
                                 </div>
                             </form>
@@ -433,126 +414,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                                     {" "}and{" "}
                                     <a href="/privacy" className="underline hover:text-black">Privacy Policy</a>.
                                 </p>
-                            </form>
-                        ) : step === "forgot_password" ? (
-                            <form onSubmit={async (e) => {
-                                e.preventDefault();
-                                if (!pin || pin.length !== 6) {
-                                    setError("Please enter a valid 6-digit PIN");
-                                    return;
-                                }
-                                if (!newPassword || newPassword.length < 6) {
-                                    setError("Password must be at least 6 characters");
-                                    return;
-                                }
-
-                                setLoading(true);
-                                setError("");
-
-                                try {
-                                    const response = await authService.resetPassword(email, pin, newPassword);
-                                    if (response.success || response.status) {
-                                        await syncLocalCartToBackend();
-                                        onClose();
-                                        window.dispatchEvent(new Event('cart-updated'));
-                                    } else {
-                                        setError(response.message || "Failed to reset password");
-                                    }
-                                } catch (err: any) {
-                                    console.error("Password reset error:", err);
-                                    setError(
-                                        err?.response?.data?.detail?.msg ||
-                                        err?.response?.data?.message ||
-                                        "Failed to reset password. Please try again."
-                                    );
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }} className="flex flex-col gap-4">
-                                {/* Title */}
-                                <div>
-                                    <h2 className="text-[28.8px] font-bold text-[#1F1F1F] mb-3 font-sans">
-                                        Forgot Password
-                                    </h2>
-                                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                                        <p className="text-[14px] text-[#6C757D]">
-                                            {email}
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => setStep("email")}
-                                            className="text-[14px] text-[#1F1F1F] underline hover:opacity-80 font-medium"
-                                        >
-                                            Change?
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Enter PIN */}
-                                <div>
-                                    <label htmlFor="reset-pin-input" className="text-[14px] text-[#1F1F1F] mb-2 block">
-                                        Enter PIN
-                                    </label>
-                                    <input
-                                        id="reset-pin-input"
-                                        type="text"
-                                        placeholder="0:28"
-                                        value={pin}
-                                        onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                        className="w-full h-[48px] bg-white border border-[#CED4DA] rounded px-4 py-2 text-[16px] text-[#1F1F1F] font-medium placeholder:text-[#A3A3A3] focus:outline-none focus:border-[#1F1F1F] focus:ring-0 transition-all"
-                                        required
-                                        autoFocus
-                                        maxLength={6}
-                                    />
-                                </div>
-
-                                {/* Set Password */}
-                                <div>
-                                    <label htmlFor="new-password-input" className="text-[14px] text-[#1F1F1F] mb-2 block">
-                                        Set Password
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            id="new-password-input"
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="Enter new password"
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                            className="w-full h-[48px] bg-white border border-[#CED4DA] rounded px-4 py-2 text-[16px] text-[#1F1F1F] font-medium placeholder:text-[#A3A3A3] focus:outline-none focus:border-[#1F1F1F] focus:ring-0 transition-all pr-12"
-                                            required
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                                        >
-                                            {showPassword ? (
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                                </svg>
-                                            ) : (
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                </svg>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {error && (
-                                    <div className="bg-red-50 border border-red-100 text-red-600 text-xs p-3 rounded-lg">
-                                        {error}
-                                    </div>
-                                )}
-
-                                {/* Update Button */}
-                                <button
-                                    type="submit"
-                                    className="w-full bg-[#343A40] text-white px-4 py-3 rounded text-[16px] font-normal hover:bg-black transition-all"
-                                >
-                                    Update
-                                </button>
                             </form>
                         ) : null}
                     </>
