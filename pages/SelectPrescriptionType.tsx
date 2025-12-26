@@ -59,7 +59,7 @@ const SelectPrescriptionType: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F0E7] font-sans py-8 px-4 md:px-8 mt-0">
+    <div className="min-h-screen bg-[#F3F0E7] font-sans py-8 px-4 md:px-8 mt-0 pb-20 md:pb-8">
       {/* Desktop Stepper */}
       <div className="hidden md:block">
         <CheckoutStepper currentStep={2} />
@@ -156,7 +156,7 @@ const SelectPrescriptionType: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Advanced & Precision+ Option */}
                 <div
-                  onClick={() => setSelectedOption("advanced")}
+                  onClick={() => handleMobileOptionSelect("advanced")}
                   className={`flex flex-col p-5 rounded-3xl border-2 cursor-pointer
                     ${selectedOption === "advanced"
                       ? "border-green-600 shadow-md"
@@ -206,7 +206,7 @@ const SelectPrescriptionType: React.FC = () => {
 
                 {/* Standard Options */}
                 <div
-                  onClick={() => setSelectedOption("standard")}
+                  onClick={() => handleMobileOptionSelect("standard")}
                   className={`flex flex-col p-5 rounded-3xl border-2 cursor-pointer
                     ${selectedOption === "standard"
                       ? "border-green-600 shadow-md"
@@ -332,9 +332,22 @@ const SelectPrescriptionType: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Mobile Continue Button */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-10">
+        <button
+          onClick={handleContinue}
+          disabled={!selectedType || (expanded && !selectedOption)}
+          className={`w-full py-3 rounded-full font-semibold text-sm uppercase tracking-wider transition-all ${selectedType && (!expanded || selectedOption)
+            ? "bg-[#184545] text-white cursor-pointer"
+            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+        >
+          Continue
+        </button>
+      </div>
     </div>
   );
 };
 
-export default SelectPrescriptionType;
-
+export default SelectPrescriptionType;0
