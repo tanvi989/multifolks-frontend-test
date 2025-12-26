@@ -109,6 +109,7 @@ const ProductPage: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [selectedColor, setSelectedColor] = useState<string>("");
+  const [selectedColorIndex, setSelectedColorIndex] = useState<number>(0); // Track the index of selected color
   const [error, setError] = useState<string | null>(null);
   const [isGetMyFitOpen, setIsGetMyFitOpen] = useState(false);
   const [userImage, setUserImage] = useState<string | null>(null);
@@ -215,7 +216,7 @@ const ProductPage: React.FC = () => {
             const fourthImageBottom = fourthImageRect.bottom + scrollPosition;
             const buttonOffset = scrollPosition + window.innerHeight - 150; // Threshold for when to hide button
 
-            // Hide button when it goes past the end of the 4th image
+            // Hide button when it goes past end of 4th image
             if (buttonOffset >= fourthImageBottom - 150) {
               setShowGetMyFitButton(false);
             } else {
@@ -304,11 +305,11 @@ const ProductPage: React.FC = () => {
         // Setup initial color if available
         if (uniqueColors && uniqueColors.length > 0) {
           const first = uniqueColors[0];
-          setSelectedColor(
-            typeof first === "string"
-              ? first
-              : getHexColorsFromNames([first.frameColor])[0] || first.frameColor
-          );
+          const colorHex = typeof first === "string"
+            ? getHexColorsFromNames([first])[0] || first
+            : getHexColorsFromNames([first.frameColor])[0] || first.frameColor;
+          setSelectedColor(colorHex);
+          setSelectedColorIndex(0); // Set initial index
         }
       } else {
         try {
@@ -391,12 +392,12 @@ const ProductPage: React.FC = () => {
 
             if (uniqueColors && uniqueColors.length > 0) {
               const first = uniqueColors[0];
-              setSelectedColor(
-                typeof first === "string"
-                  ? first
-                  : getHexColorsFromNames([first.frameColor])[0] ||
-                      first.frameColor
-              );
+              const colorHex = typeof first === "string"
+                ? getHexColorsFromNames([first])[0] || first
+                : getHexColorsFromNames([first.frameColor])[0] ||
+                    first.frameColor;
+              setSelectedColor(colorHex);
+              setSelectedColorIndex(0); // Set initial index
             }
           }
         } catch (error) {
@@ -480,13 +481,18 @@ const ProductPage: React.FC = () => {
 
             if (currentVariantColor) {
               setSelectedColor(currentVariantColor);
+              // Find the index of the current variant
+              const currentVariantIndex = uniqueColors.findIndex(
+                (v: ColorVariant) => v.skuid === freshSku
+              );
+              setSelectedColorIndex(currentVariantIndex >= 0 ? currentVariantIndex : 0);
             } else if (!selectedColor && uniqueColors.length > 0) {
               const first = uniqueColors[0];
-              setSelectedColor(
-                typeof first === "string"
-                  ? getHexColorsFromNames([first])[0]
-                  : getHexColorsFromNames([first.frameColor])[0]
-              );
+              const colorHex = typeof first === "string"
+                ? getHexColorsFromNames([first])[0]
+                : getHexColorsFromNames([first.frameColor])[0];
+              setSelectedColor(colorHex);
+              setSelectedColorIndex(0);
             }
 
             console.log(
@@ -570,7 +576,7 @@ const ProductPage: React.FC = () => {
   };
 
   const handleBuyNow = () => {
-    // Start the configuration flow: Frame Selected -> Select Prescription Type
+    // Start configuration flow: Frame Selected -> Select Prescription Type
     navigate(`/product/${id}/select-prescription-type`, {
       state: { product: state?.product || product },
     });
@@ -589,14 +595,16 @@ const ProductPage: React.FC = () => {
     }
   };
 
-  const handleColorClick = (colorItem: string | ColorVariant) => {
+  const handleColorClick = (colorItem: string | ColorVariant, index: number) => {
     if (typeof colorItem === "string") {
       const hex = getHexColorsFromNames([colorItem])[0] || colorItem;
       setSelectedColor(hex);
+      setSelectedColorIndex(index); // Update the selected index
     } else {
       // It's a variant, navigate to it
       const hex = getHexColorsFromNames([colorItem.frameColor])[0];
       setSelectedColor(hex);
+      setSelectedColorIndex(index); // Update the selected index
       if (colorItem.skuid !== id) {
         navigate(`/product/${colorItem.skuid}`);
       }
@@ -758,17 +766,19 @@ const ProductPage: React.FC = () => {
                         ].includes(colorHex.toLowerCase()) ||
                         colorHex.toLowerCase() === "#ffffff";
 
+                      const isSelected = selectedColorIndex === idx; // Check if this color is selected by index
+
                       return (
                         <div
                           key={idx}
                           className="flex flex-col items-center gap-1"
                         >
                           <button
-                            onClick={() => handleColorClick(colorItem)}
+                            onClick={() => handleColorClick(colorItem, idx)}
                             className={`w-8 h-8 rounded-full transition-all duration-200 flex-shrink-0 ${
                               isLightColor ? "border border-gray-200" : ""
                             } ${
-                              selectedColor === colorHex
+                              isSelected
                                 ? "ring-2 ring-[#1F1F1F] ring-offset-2"
                                 : "hover:ring-2 hover:ring-gray-300 hover:ring-offset-2"
                             }`}
@@ -876,9 +886,9 @@ const ProductPage: React.FC = () => {
                     Not just lenses. Life upgrades.
                   </span>
                   <br />
-                  Multifocal lenses aren’t one-size-fits-all. Whether you’re
-                  reading recipes, running meetings, or road-tripping on the
-                  weekends — the right lens makes all the difference.
+                  Multifocal lenses aren't one-size-fits-all. Whether you're
+                  reading recipes, running meetings, or road-tripping on
+                  weekends — right lens makes all the difference.
                 </p>
 
                 <p>
@@ -936,7 +946,7 @@ const ProductPage: React.FC = () => {
                 </p>
 
                 <p>
-                  Not quite right? You’ve got 30 days to return or refund. No
+                  Not quite right? You've got 30 days to return or refund. No
                   questions asked.
                 </p>
               </div>
@@ -1079,14 +1089,16 @@ const ProductPage: React.FC = () => {
                         "#fafafa",
                       ].includes(colorHex.toLowerCase());
 
+                      const isSelected = selectedColorIndex === idx; // Check if this color is selected by index
+
                       return (
                         <button
                           key={idx}
-                          onClick={() => handleColorClick(colorItem)}
+                          onClick={() => handleColorClick(colorItem, idx)}
                           className={`w-5 h-5 rounded-full transition-all duration-200 ${
                             isLightColor ? "border border-gray-200" : ""
                           } ${
-                            selectedColor === colorHex
+                            isSelected
                               ? "ring-2 ring-[#1F1F1F] ring-offset-2"
                               : "hover:ring-2 hover:ring-gray-300 hover:ring-offset-2"
                           }`}
@@ -1102,7 +1114,7 @@ const ProductPage: React.FC = () => {
 
           {/* Accordions */}
           <div className="mb-8">
-            <AccordionItem
+            {/* <AccordionItem
               title="FEATURES"
               isOpen={openAccordion === "FEATURES"}
               onClick={() => toggleAccordion("FEATURES")}
@@ -1112,7 +1124,7 @@ const ProductPage: React.FC = () => {
                   <li key={idx}>{feature}</li>
                 ))}
               </ul>
-            </AccordionItem>
+            </AccordionItem> */}
 
             <AccordionItem
               title="DESCRIPTION"
@@ -1190,9 +1202,9 @@ const ProductPage: React.FC = () => {
                     Not just lenses. Life upgrades.
                   </span>
                   <br />
-                  Multifocal lenses aren’t one-size-fits-all. Whether you’re
-                  reading recipes, running meetings, or road-tripping on the
-                  weekends — the right lens makes all the difference.
+                  Multifocal lenses aren't one-size-fits-all. Whether you're
+                  reading recipes, running meetings, or road-tripping on
+                  weekends — right lens makes all the difference.
                 </p>
 
                 <p>
@@ -1250,7 +1262,7 @@ const ProductPage: React.FC = () => {
                 </p>
 
                 <p>
-                  Not quite right? You’ve got 30 days to return or refund. No
+                  Not quite right? You've got 30 days to return or refund. No
                   questions asked.
                 </p>
               </div>
