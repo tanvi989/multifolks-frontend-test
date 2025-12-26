@@ -123,6 +123,7 @@ const FILTER_OPTIONS = {
   Size: ["Large", "Medium", "Small"],
   Brand: ["Berg", "Face A Face", "Leon", "Miyama"],
   Styles: ["Full Frame", "Half Frame", "Rimless"],
+  Gender: ["Men", "Women"],
   Shape: [
     "Aviator",
     "Cateye",
@@ -169,12 +170,17 @@ const MobileFilterSortModal: React.FC<{
     if (!isOpen) return null;
 
     const filterCategories = [
+      { key: "Gender", title: "Gender", options: FILTER_OPTIONS.Gender },
       { key: "Prices", title: "Prices", options: PRICES },
       { key: "Shape", title: "Shape", options: FILTER_OPTIONS.Shape },
       { key: "FrameColors", title: "Frame Colors", options: FRAME_COLORS },
       { key: "Material", title: "Material", options: MATERIALS },
       { key: "Collections", title: "Collections", options: COLLECTIONS },
       { key: "Comfort", title: "Comfort", options: COMFORT },
+      { key: "Size", title: "Size", options: FILTER_OPTIONS.Size },
+      { key: "Brand", title: "Brand", options: FILTER_OPTIONS.Brand },
+      { key: "Styles", title: "Styles", options: FILTER_OPTIONS.Styles },
+      { key: "ShopFor", title: "Shop For", options: SHOP_FOR },
     ];
 
     if (type === "sort") {
@@ -237,7 +243,7 @@ const MobileFilterSortModal: React.FC<{
     }
 
     // Filter Modal
-    const [activeCategory, setActiveCategory] = useState<string>("Prices");
+    const [activeCategory, setActiveCategory] = useState<string>("Gender");
 
     return (
       <div className="fixed inset-0 z-50 lg:hidden">
@@ -277,8 +283,8 @@ const MobileFilterSortModal: React.FC<{
                 >
                   {cat.title}
                   {selectedFilters[cat.key]?.length > 0 && (
-                    <span className="ml-2 w-5 h-5 inline-flex items-center justify-center bg-white text-white text-xs rounded-full">
-                      <Check color="green" />
+                    <span className="ml-2 w-5 h-5 inline-flex items-center justify-center bg-black text-white text-xs rounded-full">
+                      <Check color="white" />
                     </span>
                   )}
                 </button>
@@ -398,6 +404,7 @@ const MenCollection: React.FC = () => {
     Collections: [],
     Comfort: [],
     FrameColors: [],
+    Gender: [], // Added Gender filter
   });
 
   // Calculate total active filters for mobile badge
@@ -424,6 +431,11 @@ const MenCollection: React.FC = () => {
         limit: 2000, // Fetch all (or a very large number) to bypass backend pagination issues
         gender: "Men",
       };
+
+      // Gender filter
+      if (selectedFilters.Gender.length > 0) {
+        params.gender = selectedFilters.Gender.join("|");
+      }
 
       // Price (Parse ranges like "£80 - 100", "Under £50", "£150+")
       if (selectedFilters.Prices.length > 0) {
@@ -535,6 +547,7 @@ const MenCollection: React.FC = () => {
       Collections: [],
       Comfort: [],
       FrameColors: [],
+      Gender: [], // Added Gender filter
     });
   };
 
