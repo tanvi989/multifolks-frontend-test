@@ -86,50 +86,138 @@ const MobileCart: React.FC<MobileCartProps> = ({
     }, []);
 
     // Helper function to get prescription from user's prescriptions array (database)
-    const getPrescriptionByCartId = (cartId: number, cartItem?: CartItem): any | null => {
+    // Updated to match DesktopCart implementation
+    const getPrescriptionByCartId = (
+        cartId: number,
+        productSku?: string,
+        cartItem?: CartItem
+    ): any | null => {
         try {
+            console.log(`🔍 [MobileCart getPrescriptionByCartId] Checking for cartId: ${cartId}, productSku: ${productSku}`);
+            console.log(`🔍 [MobileCart getPrescriptionByCartId] Cart item prescription:`, cartItem?.prescription);
+            
             // Check if cart item already has prescription linked
             if (cartItem?.prescription) {
-                console.log('✅ Found prescription on cart item (Mobile):', cartItem.prescription);
+                console.log('✅ Found prescription on cart item:', cartItem.prescription);
                 return cartItem.prescription;
             }
 
-            // Search user's prescriptions array from database
+            // Check user prescriptions from database
             if (userPrescriptions && userPrescriptions.length > 0) {
+                console.log(`🔍 [MobileCart getPrescriptionByCartId] Checking ${userPrescriptions.length} user prescriptions...`);
+                
+                // Log first prescription structure for debugging
+                if (userPrescriptions.length > 0) {
+                    console.log(`🔍 [MobileCart getPrescriptionByCartId] Sample prescription structure:`, JSON.stringify(userPrescriptions[0], null, 2));
+                }
+                
+                // ✅ FIX: Check multiple possible locations for cartId
                 let prescription = userPrescriptions.find((p: any) => {
+                    if (!p) return false;
+                    
                     // Check nested data.associatedProduct.cartId
                     const dataCartId = p?.data?.associatedProduct?.cartId;
                     // Check root level associatedProduct.cartId
                     const rootCartId = p?.associatedProduct?.cartId;
-                    // Check if cartId matches
-                    return (dataCartId && String(dataCartId) === String(cartId)) ||
-                           (rootCartId && String(rootCartId) === String(cartId));
+                    // Also check if data itself has cartId
+                    const directCartId = p?.data?.cartId || p?.cartId;
+                    // Check if associatedProduct is at root level with cartId
+                    const rootAssociatedCartId = p?.associatedProduct?.cartId;
+                    
+                    // Also check deeply nested structures
+                    const deepDataCartId = p?.data?.data?.associatedProduct?.cartId;
+                    
+                    const matches = (dataCartId && String(dataCartId) === String(cartId)) ||
+                                   (rootCartId && String(rootCartId) === String(cartId)) ||
+                                   (directCartId && String(directCartId) === String(cartId)) ||
+                                   (rootAssociatedCartId && String(rootAssociatedCartId) === String(cartId)) ||
+                                   (deepDataCartId && String(deepDataCartId) === String(cartId));
+                    
+                    if (matches) {
+                        console.log('✅ [MobileCart getPrescriptionByCartId] Found matching prescription:', {
+                            dataCartId,
+                            rootCartId,
+                            directCartId,
+                            rootAssociatedCartId,
+                            deepDataCartId,
+                            fullPrescription: p
+                        });
+                    }
+                    
+                    return matches;
                 });
 
+                // Optional fallback (if cartId missing, try productSku)
+                if (!prescription && productSku) {
+                    console.log(`🔍 [MobileCart getPrescriptionByCartId] Trying productSku fallback: ${productSku}`);
+                    prescription = userPrescriptions.find((p: any) => {
+                        if (!p) return false;
+                        const dataSku = p?.data?.associatedProduct?.productSku;
+                        const rootSku = p?.associatedProduct?.productSku;
+                        const deepDataSku = p?.data?.data?.associatedProduct?.productSku;
+                        return (dataSku && dataSku === productSku) ||
+                               (rootSku && rootSku === productSku) ||
+                               (deepDataSku && deepDataSku === productSku);
+                    });
+                    if (prescription) {
+                        console.log('✅ [MobileCart getPrescriptionByCartId] Found prescription by productSku:', prescription);
+                    }
+                }
+
                 if (prescription) {
-                    console.log('✅ Found prescription in user database (Mobile):', prescription);
+                    console.log('✅ [MobileCart getPrescriptionByCartId] Returning prescription from database:', prescription);
                     return prescription;
                 }
+            } else {
+                console.log(`⚠️ [MobileCart getPrescriptionByCartId] No user prescriptions available (count: ${userPrescriptions?.length || 0})`);
             }
 
             // Also check localStorage as fallback
             try {
                 const localPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
+                console.log(`🔍 [MobileCart getPrescriptionByCartId] Checking ${localPrescriptions.length} localStorage prescriptions...`);
                 const localPrescription = localPrescriptions.find((p: any) => {
                     const pCartId = p?.associatedProduct?.cartId;
-                    return pCartId && String(pCartId) === String(cartId);
+                    const matches = pCartId && String(pCartId) === String(cartId);
+                    if (matches) {
+                        console.log('✅ [MobileCart getPrescriptionByCartId] Found matching localStorage prescription:', p);
+                    }
+                    return matches;
                 });
                 if (localPrescription) {
-                    console.log('✅ Found prescription in localStorage (Mobile):', localPrescription);
+                    console.log('✅ [MobileCart getPrescriptionByCartId] Returning prescription from localStorage:', localPrescription);
                     return localPrescription;
                 }
             } catch (e) {
-                console.error("Error checking localStorage prescriptions:", e);
+                console.error("❌ [MobileCart getPrescriptionByCartId] Error checking localStorage prescriptions:", e);
             }
 
+            // Check session storage for product-based prescriptions (from product pages)
+            try {
+                if (productSku) {
+                    const sessionPrescriptions = JSON.parse(sessionStorage.getItem('productPrescriptions') || '{}');
+                    const productPrescription = sessionPrescriptions[productSku];
+                    if (productPrescription) {
+                        console.log('✅ [MobileCart getPrescriptionByCartId] Found prescription in sessionStorage for product SKU:', productSku);
+                        // Link it to this cart item
+                        if (productPrescription.associatedProduct) {
+                            productPrescription.associatedProduct.cartId = String(cartId);
+                            // Update session storage with cartId
+                            sessionPrescriptions[productSku] = productPrescription;
+                            sessionStorage.setItem('productPrescriptions', JSON.stringify(sessionPrescriptions));
+                            console.log('✅ [MobileCart getPrescriptionByCartId] Linked prescription to cartId:', cartId);
+                        }
+                        return productPrescription;
+                    }
+                }
+            } catch (e) {
+                console.error("❌ [MobileCart getPrescriptionByCartId] Error checking sessionStorage prescriptions:", e);
+            }
+
+            console.log(`❌ [MobileCart getPrescriptionByCartId] No prescription found for cartId: ${cartId}`);
             return null;
         } catch (error) {
-            console.error("Error fetching prescription from user database:", error);
+            console.error("❌ [MobileCart getPrescriptionByCartId] Error fetching prescription:", error);
             return null;
         }
     };
@@ -172,8 +260,6 @@ const MobileCart: React.FC<MobileCartProps> = ({
             // Refresh prescriptions and cart
             if (authData.isAuthenticated && refetchPrescriptions) {
                 refetchPrescriptions();
-            } else {
-                queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
             }
             if (refetchCart) {
                 refetchCart();
@@ -192,21 +278,10 @@ const MobileCart: React.FC<MobileCartProps> = ({
         <div className="md:hidden max-w-[1366px] mx-auto px-4 md:px-21 bg-white">
             {/* Satisfaction Banner - Mobile Only */}
             <div className="flex items-start gap-4 py-6 px-2 w-full">
-                {/* <img
-                    src="/Satisfaction_Icon.svg"
-                    alt="satisfaction guarantee"
-                    className="h-[85px] w-auto flex-shrink-0 object-contain"
-                />
-                <p className="text-[13px] leading-relaxed text-[#1F1F1F] font-medium">
-                    Just in case you don't like your MultiFolks glasses we offer full refund, No question asked!
-                    <br />
-                    <span className="underline underline-offset-2 cursor-pointer">See our Policy</span>
-                </p> */}
                 <div className="bg-green-100 text-[#2E7D32] px-4 py-3 rounded-md font-bold text-sm mb-6 border">
                     Satisfaction Guaranteed - Hassle Free 30 Days Refunds.
                 </div>
             </div>
-
 
             {/* Payment Method Selection */}
             <div className="mb-6">
@@ -345,41 +420,64 @@ const MobileCart: React.FC<MobileCartProps> = ({
                                                 </span>
                                             </p>
 
-                                            {/* Show Prescription Button */}
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        const prescription = getPrescriptionByCartId(item.cart_id, item);
-                                                        if (prescription) {
-                                                            setViewPrescription(prescription);
-                                                        } else {
-                                                            // Redirect to manual prescription page with cart_id
-                                                            navigate(`/manual-prescription?cart_id=${item.cart_id}`);
-                                                        }
-                                                    }}
-                                                    className="bg-[#E94D37] hover:bg-[#bf3e2b] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors"
-                                                >
-                                                    {(() => {
-                                                        // Force re-evaluation when prescriptionRefresh changes
-                                                        const _ = prescriptionRefresh;
-                                                        return getPrescriptionByCartId(item.cart_id, item) ? 'Show Prescription' : 'Add Prescription';
-                                                    })()}
-                                                </button>
+                                            {/* Prescription Buttons - Updated to match DesktopCart behavior */}
+                                            <div className="mt-2">
                                                 {(() => {
-                                                    const _ = prescriptionRefresh;
-                                                    const prescription = getPrescriptionByCartId(item.cart_id, item);
+                                                    const _ = prescriptionRefresh; // Force re-evaluation
+                                                    const productSku = item.product?.products?.skuid || item.product_id;
+                                                    const prescription = getPrescriptionByCartId(item.cart_id, productSku, item);
+                                                    
                                                     if (prescription) {
+                                                        // Prescription exists - show View, Upload, and Manual options
+                                                        return (
+                                                            <div className="flex flex-col gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        console.log('📋 Opening prescription modal with data:', prescription);
+                                                                        setViewPrescription(prescription);
+                                                                    }}
+                                                                    className="bg-[#E94D37] hover:bg-[#bf3e2b] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors w-full"
+                                                                >
+                                                                    View Prescription
+                                                                </button>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            // Navigate to upload prescription page with cart_id
+                                                                            navigate(`/upload-prescription?cart_id=${item.cart_id}`);
+                                                                        }}
+                                                                        className="text-[#025048] hover:text-[#013a34] text-[10px] font-medium underline transition-colors w-fit text-left"
+                                                                        title="Upload a new prescription image to replace existing one"
+                                                                    >
+                                                                        Upload Prescription
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            // Navigate to manual prescription page with cart_id
+                                                                            navigate(`/manual-prescription?cart_id=${item.cart_id}`);
+                                                                        }}
+                                                                        className="text-[#025048] hover:text-[#013a34] text-[10px] font-medium underline transition-colors w-fit text-left"
+                                                                        title="Add manual prescription to replace existing one"
+                                                                    >
+                                                                        Add Manual Prescription
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    } else {
+                                                        // No prescription - show ONLY Add Prescription button
                                                         return (
                                                             <button
-                                                                onClick={() => handleRemovePrescription(item.cart_id, prescription)}
-                                                                className="text-[#E53935] hover:text-[#D32F2F] text-[10px] font-bold underline transition-colors"
-                                                                title="Remove Prescription"
+                                                                onClick={() => {
+                                                                    // Redirect to manual prescription page with cart_id
+                                                                    navigate(`/manual-prescription?cart_id=${item.cart_id}`);
+                                                                }}
+                                                                className="bg-[#E94D37] hover:bg-[#bf3e2b] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors w-full"
                                                             >
-                                                                Remove
+                                                                Add Prescription
                                                             </button>
                                                         );
                                                     }
-                                                    return null;
                                                 })()}
                                             </div>
                                         </div>
@@ -593,7 +691,6 @@ const MobileCart: React.FC<MobileCartProps> = ({
                     </div>
                 </div>
 
-
                 {/* Price Summary - Mobile Version */}
                 <div className="bg-white p-4 rounded border border-gray-200">
                     <button
@@ -702,12 +799,9 @@ const MobileCart: React.FC<MobileCartProps> = ({
                 </div>
             </div>
 
-
             <div className="flex justify-center items-center p-6">
                 <p className=" text-xl text-black font-bold ">Prices includes applicable VAT</p>
             </div>
-
-
 
             {/* Trust & Policy Section */}
             <div className="bg-[#F8F9FA] py-8 mb-6">
@@ -774,7 +868,8 @@ const MobileCart: React.FC<MobileCartProps> = ({
                 prescription={viewPrescription}
                 onRemove={viewPrescription ? () => {
                     const cartItem = cartItems.find((item: CartItem) => {
-                        const prescription = getPrescriptionByCartId(item.cart_id, item);
+                        const productSku = item.product?.products?.skuid || item.product_id;
+                        const prescription = getPrescriptionByCartId(item.cart_id, productSku, item);
                         return prescription && (prescription.id === viewPrescription.id || prescription._id === viewPrescription._id);
                     });
                     if (cartItem) {
@@ -782,7 +877,7 @@ const MobileCart: React.FC<MobileCartProps> = ({
                     }
                 } : undefined}
             />
-        </div >
+        </div>
     );
 };
 
