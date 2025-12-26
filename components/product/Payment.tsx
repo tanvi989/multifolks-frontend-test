@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -16,6 +15,10 @@ import {
   payPartialAmount,
   placeOrder,
   createPaymentSession,
+  getUserAddresses,
+  saveUserAddress,
+  deleteUserAddress,
+  updateUserAddress,
 } from "../../api/retailerApis";
 import WhyMutlifolks from "@/components/WhyMutlifolks";
 import { Loader } from "../Loader";
@@ -30,6 +33,20 @@ interface LocationState {
   order_id?: string;
   address_id?: string;
   is_partial?: boolean;
+}
+
+interface SavedAddress {
+  id: string;
+  full_name: string;
+  email: string;
+  mobile: string;
+  address_line: string;
+  city: string;
+  state: string;
+  country: string;
+  zip: string;
+  address_type: string;
+  is_default: boolean;
 }
 
 // Enhanced Mock Data for Auto-fill with Coordinates
@@ -113,14 +130,150 @@ const MOCK_ADDRESS_SUGGESTIONS = [
   },
 ];
 
+// Saved Addresses Modal Component
+const SavedAddressesModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectAddress: (address: SavedAddress) => void;
+  selectedAddressId?: string;
+}> = ({ isOpen, onClose, onSelectAddress, selectedAddressId }) => {
+  const queryClient = useQueryClient();
+
+  const { data: addressesResponse = {}, isLoading, refetch } = useQuery({
+    queryKey: ["user-addresses"],
+    queryFn: getUserAddresses,
+  });
+
+  const addresses = addressesResponse?.data?.addresses || [];
+
+  const deleteAddressMutation = useMutation({
+    mutationFn: deleteUserAddress,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-addresses"] });
+    },
+  });
+
+  const handleDeleteAddress = (addressId: string) => {
+    if (window.confirm("Are you sure you want to delete this address?")) {
+      deleteAddressMutation.mutate(addressId);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-bold text-[#1F1F1F]">Saved Addresses</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader />
+            </div>
+          ) : addresses.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">No saved addresses found</p>
+              <button
+                onClick={onClose}
+                className="text-sm font-bold text-[#E94D37] hover:underline"
+              >
+                Add a new address
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {addresses.map((address: SavedAddress) => (
+                <div
+                  key={address.id}
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    selectedAddressId === address.id
+                      ? "border-[#E94D37] bg-[#FFF5F5]"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                  onClick={() => onSelectAddress(address)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold text-[#1F1F1F]">{address.full_name}</span>
+                        {address.is_default && (
+                          <span className="text-xs bg-[#E94D37] text-white px-2 py-1 rounded-full">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1">{address.address_line}</p>
+                      <p className="text-sm text-gray-600">
+                        {address.city}, {address.state} {address.zip}
+                      </p>
+                      <p className="text-sm text-gray-600">{address.country}</p>
+                      <p className="text-sm text-gray-600 mt-1">{address.mobile}</p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteAddress(address.id);
+                      }}
+                      className="text-red-500 hover:text-red-700 transition-colors ml-4"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              refetch();
+              onClose();
+            }}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#E94D37] rounded-md hover:bg-[#d43f2a] transition-colors"
+          >
+            Add New Address
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AddressForm = React.forwardRef<
   { submit: () => void },
   { onNext: (data: any) => void; onFormValidityChange?: (isValid: boolean) => void }
 >(({ onNext, onFormValidityChange }, ref) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const desktopFormRef = useRef<HTMLFormElement>(null);
   const mobileFormRef = useRef<HTMLFormElement>(null);
+
+  const [showSavedAddresses, setShowSavedAddresses] = useState(false);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string>();
 
   React.useImperativeHandle(ref, () => ({
     submit: () => {
@@ -131,6 +284,7 @@ const AddressForm = React.forwardRef<
       }
     },
   }));
+
   // Form State
   const [formData, setFormData] = useState({
     fullName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "",
@@ -142,6 +296,15 @@ const AddressForm = React.forwardRef<
     country: "",
     zip: "",
     addressType: "Home", // Default
+    isDefaultAddress: false, // Added this to track default address
+  });
+
+  // Save address mutation
+  const saveAddressMutation = useMutation({
+    mutationFn: saveUserAddress,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-addresses"] });
+    },
   });
 
   // Check if form is valid
@@ -206,8 +369,13 @@ const AddressForm = React.forwardRef<
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    // Handle checkbox separately
+    if (type === 'checkbox') {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSelectAddress = (item: (typeof MOCK_ADDRESS_SUGGESTIONS)[0]) => {
@@ -224,6 +392,23 @@ const AddressForm = React.forwardRef<
       setMapCoordinates({ lat: item.lat, lon: item.lon });
     }
     setShowSuggestions(false);
+  };
+
+  const handleSelectSavedAddress = (address: SavedAddress) => {
+    setFormData({
+      fullName: address.full_name,
+      email: address.email,
+      mobile: address.mobile,
+      addressLine: address.address_line,
+      city: address.city,
+      state: address.state,
+      country: address.country,
+      zip: address.zip,
+      addressType: address.address_type,
+      isDefaultAddress: address.is_default,
+    });
+    setSelectedSavedAddressId(address.id);
+    setShowSavedAddresses(false);
   };
 
   const handleLocationClick = () => {
@@ -305,6 +490,20 @@ const AddressForm = React.forwardRef<
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Always save the address to localStorage
+    try {
+      await saveAddressMutation.mutateAsync(formData);
+    } catch (error) {
+      console.error("Failed to save address:", error);
+      // Continue with form submission even if saving fails
+    }
+    
+    onNext(formData);
+  };
+
   return (
     <div className="w-full">
       {/* Desktop Layout - Unchanged */}
@@ -318,17 +517,17 @@ const AddressForm = React.forwardRef<
             <h3 className="text-sm font-bold text-[#1F1F1F]">
               Where should we send your glasses?
             </h3>
-            <button className="text-xs font-bold text-[#1F1F1F] border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50 transition-colors">
+            <button 
+              onClick={() => setShowSavedAddresses(true)}
+              className="text-xs font-bold text-[#1F1F1F] border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50 transition-colors"
+            >
               View Saved Addresses
             </button>
           </div>
 
           <form
             ref={desktopFormRef}
-            onSubmit={(e) => {
-              e.preventDefault();
-              onNext(formData);
-            }}
+            onSubmit={handleSubmit}
             className="flex flex-col gap-5"
           >
             {/* Row 1 */}
@@ -442,6 +641,9 @@ const AddressForm = React.forwardRef<
               <input
                 type="checkbox"
                 id="default-address"
+                name="isDefaultAddress"
+                checked={formData.isDefaultAddress}
+                onChange={handleInputChange}
                 className="w-4 h-4 cursor-pointer rounded border-gray-300 text-[#1F1F1F] focus:ring-[#1F1F1F] accent-[#1F1F1F]"
               />
               <label
@@ -455,10 +657,10 @@ const AddressForm = React.forwardRef<
             <div className="mt-6 flex justify-center">
               <button
                 type="submit"
-                // disabled={!isFormValid}
+                disabled={saveAddressMutation.isLoading}
                 className="bg-[#E94D37] text-white px-16 py-3 rounded-md font-bold text-sm hover:bg-[#d43f2a] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#E94D37]"
               >
-                Checkout Now
+                {saveAddressMutation.isLoading ? "Saving..." : "Checkout Now"}
               </button>
             </div>
           </form>
@@ -480,13 +682,24 @@ const AddressForm = React.forwardRef<
           </button>
         </div>
 
+        {/* Mobile Saved Addresses Button */}
+        <div className="mb-4">
+          <button 
+            onClick={() => setShowSavedAddresses(true)}
+            className="w-full text-sm font-bold text-[#1F1F1F] border border-gray-300 px-4 py-2 rounded hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            View Saved Addresses
+          </button>
+        </div>
+
         <form
           id="mobile-address-form"
           ref={mobileFormRef}
-          onSubmit={(e) => {
-            e.preventDefault();
-            onNext(formData);
-          }}
+          onSubmit={handleSubmit}
           className="space-y-8 pb-32"
         >
           {/* Contact Details Section */}
@@ -553,17 +766,6 @@ const AddressForm = React.forwardRef<
                 />
               </div>
             </div>
-
-            {/* <div className="w-full h-32 bg-[#1a1a1a] rounded-xl flex flex-col items-start justify-end p-4">
-              <div className="flex items-center gap-2 text-white">
-                <span className="text-xs font-bold">Google Maps</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-              </div>
-            </div> */}
           </div>
 
           {/* Address Details Section */}
@@ -660,8 +862,34 @@ const AddressForm = React.forwardRef<
               ))}
             </div>
           </div>
+
+          {/* Added Save as Default Address checkbox for mobile */}
+          <div className="flex items-center gap-3 mt-2">
+            <input
+              type="checkbox"
+              id="mobile-default-address"
+              name="isDefaultAddress"
+              checked={formData.isDefaultAddress}
+              onChange={handleInputChange}
+              className="w-4 h-4 cursor-pointer rounded border-gray-300 text-[#1F1F1F] focus:ring-[#1F1F1F] accent-[#1F1F1F]"
+            />
+            <label
+              htmlFor="mobile-default-address"
+              className="text-sm font-medium text-[#1F1F1F] cursor-pointer"
+            >
+              Save as Default Address
+            </label>
+          </div>
         </form>
       </div>
+
+      {/* Saved Addresses Modal */}
+      <SavedAddressesModal
+        isOpen={showSavedAddresses}
+        onClose={() => setShowSavedAddresses(false)}
+        onSelectAddress={handleSelectSavedAddress}
+        selectedAddressId={selectedSavedAddressId}
+      />
     </div>
   );
 });
@@ -765,103 +993,101 @@ const CheckoutSummary = ({
       </div>
 
       {/* Desktop Trust Badges */}
-      {/* <div className="hidden md:block bg-white p-6 rounded-sm border border-gray-300 mt-6"> */}
-        <div className="bg-white p-4 md:p-6 rounded border border-gray-200 flex flex-col items-center text-center">
-          <div className="w-12 h-12 md:w-16 md:h-16 mb-4">
-            {/* Seal SVG Placeholder */}
-            <svg
-              viewBox="0 0 100 100"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-full h-full text-black"
+      <div className="bg-white p-4 md:p-6 rounded border border-gray-200 flex flex-col items-center text-center">
+        <div className="w-12 h-12 md:w-16 md:h-16 mb-4">
+          {/* Seal SVG Placeholder */}
+          <svg
+            viewBox="0 0 100 100"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-full h-full text-black"
+          >
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+            <path
+              d="M50 15 L55 35 L75 35 L60 50 L65 70 L50 60 L35 70 L40 50 L25 35 L45 35 Z"
+              fill="currentColor"
+              opacity="0.1"
+            />
+            <text
+              x="50"
+              y="55"
+              textAnchor="middle"
+              fontSize="12"
+              fontWeight="bold"
+              fill="currentColor"
             >
-              <circle
-                cx="50"
-                cy="50"
-                r="45"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <path
-                d="M50 15 L55 35 L75 35 L60 50 L65 70 L50 60 L35 70 L40 50 L25 35 L45 35 Z"
-                fill="currentColor"
-                opacity="0.1"
-              />
-              <text
-                x="50"
-                y="55"
-                textAnchor="middle"
-                fontSize="12"
-                fontWeight="bold"
-                fill="currentColor"
-              >
-                100%
-              </text>
-              <text
-                x="50"
-                y="65"
-                textAnchor="middle"
-                fontSize="8"
-                fill="currentColor"
-              >
-                GUARANTEE
-              </text>
-            </svg>
-          </div>
-          <p className="text-xs text-gray-600 mb-6 leading-relaxed">
-            If you're not 100% satisfied with your purchase within 30
-            days, our Customer Happiness team is ready to assist with a
-            hassle-free refund, 24/7. Just email us.
-          </p>
+              100%
+            </text>
+            <text
+              x="50"
+              y="65"
+              textAnchor="middle"
+              fontSize="8"
+              fill="currentColor"
+            >
+              GUARANTEE
+            </text>
+          </svg>
+        </div>
+        <p className="text-xs text-gray-600 mb-6 leading-relaxed">
+          If you're not 100% satisfied with your purchase within 30
+          days, our Customer Happiness team is ready to assist with a
+          hassle-free refund, 24/7. Just email us.
+        </p>
 
-          <div className="flex flex-col md:flex-row md:justify-center md:gap-8 text-xs text-gray-500 font-bold mb-6 w-full border-t border-gray-100 pt-4">
-            <span className="flex items-center gap-2 justify-center mb-2 md:mb-0">
-              <span className="w-2 h-2 rounded-full bg-gray-400"></span>{" "}
-              Secure Payment
-            </span>
-            <span className="flex items-center gap-2 justify-center">
-              <span className="w-2 h-2 rounded-full bg-gray-400"></span>{" "}
-              30 Days Easy Refund
-            </span>
-          </div>
-          <div className="flex justify-center gap-2 md:gap-3 opacity-60">
-            {/* Payment Icons */}
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png"
-              className="h-3 md:h-4"
-              alt="Visa"
-            />
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png"
-              className="h-3 md:h-4"
-              alt="Mastercard"
-            />
-            <div className="flex items-center gap-1 text-[6px] md:text-[8px] font-bold border border-gray-300 px-1 rounded">
-              <svg
-                width="8"
-                height="8"
-                className="md:w-2 md:h-2"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <rect
-                  x="3"
-                  y="11"
-                  width="18"
-                  height="11"
-                  rx="2"
-                  ry="2"
-                ></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              256 BIT SSL
-            </div>
+        <div className="flex flex-col md:flex-row md:justify-center md:gap-8 text-xs text-gray-500 font-bold mb-6 w-full border-t border-gray-100 pt-4">
+          <span className="flex items-center gap-2 justify-center mb-2 md:mb-0">
+            <span className="w-2 h-2 rounded-full bg-gray-400"></span>{" "}
+            Secure Payment
+          </span>
+          <span className="flex items-center gap-2 justify-center">
+            <span className="w-2 h-2 rounded-full bg-gray-400"></span>{" "}
+            30 Days Easy Refund
+          </span>
+        </div>
+        <div className="flex justify-center gap-2 md:gap-3 opacity-60">
+          {/* Payment Icons */}
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png"
+            className="h-3 md:h-4"
+            alt="Visa"
+          />
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png"
+            className="h-3 md:h-4"
+            alt="Mastercard"
+          />
+          <div className="flex items-center gap-1 text-[6px] md:text-[8px] font-bold border border-gray-300 px-1 rounded">
+            <svg
+              width="8"
+              height="8"
+              className="md:w-2 md:h-2"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect
+                x="3"
+                y="11"
+                width="18"
+                height="11"
+                rx="2"
+                ry="2"
+              ></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            256 BIT SSL
           </div>
         </div>
       </div>
-    // </div>
+    </div>
   );
 };
 
