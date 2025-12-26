@@ -69,10 +69,11 @@ const MobileCart: React.FC<MobileCartProps> = ({
     refetchCart,
 }) => {
     const queryClient = useQueryClient();
-    const [shippingOpen, setShippingOpen] = useState(false);
-    const [addressOpen, setAddressOpen] = useState(false);
-    const [cartItemsOpen, setCartItemsOpen] = useState(false);
-    const [priceDetailsOpen, setPriceDetailsOpen] = useState(false);
+    // Changed all to true to keep sections open by default
+    const [shippingOpen, setShippingOpen] = useState(true);
+    const [addressOpen, setAddressOpen] = useState(true);
+    const [cartItemsOpen, setCartItemsOpen] = useState(true);
+    const [priceDetailsOpen, setPriceDetailsOpen] = useState(true);
     const [viewPrescription, setViewPrescription] = useState<any>(null);
     const [prescriptionRefresh, setPrescriptionRefresh] = useState(0);
 
