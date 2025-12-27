@@ -250,7 +250,7 @@ const OrderView: React.FC<OrderViewProps> = () => {
                     />
                     <div className="flex justify-between items-center py-4 px-4 bg-[#232320] text-white">
                       <span className="font-bold text-sm uppercase tracking-wider">
-                        Total Payable
+                        Total Paid
                       </span>
                       <span className="font-bold text-lg">
                         £{totalPayable.toFixed(2)}
