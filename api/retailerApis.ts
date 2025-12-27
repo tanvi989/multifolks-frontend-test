@@ -74,9 +74,9 @@ Subject: Welcome to MultiFolks!
 
 Hi ${name},
 
-Thanks for signing up — glad to have you here.
+Thanks for signing up â€” glad to have you here.
 
-Our smarter tech, affordable pricing, and glasses are designed for how you actually live — not just how you see.
+Our smarter tech, affordable pricing, and glasses are designed for how you actually live â€” not just how you see.
 
 You'll hear from us with tips, offers, and updates tailored to your needs. But we'll keep it useful, not overwhelming. Promise.
 
@@ -266,14 +266,14 @@ export const updateCartQuantity = (cart_id: number, quantity: number) => {
 // SYNC: Sync Local Cart to Backend (Merge Guest Cart with Authenticated User Cart)
 // ALTERNATIVE IMPLEMENTATION: Uses existing endpoints instead of problematic merge endpoint
 export const syncLocalCartToBackend = async () => {
-    console.log('🔄 syncLocalCartToBackend: Starting cart merge...');
+    console.log('ðŸ”„ syncLocalCartToBackend: Starting cart merge...');
 
     try {
         const token = localStorage.getItem('token');
         const guestId = localStorage.getItem('guest_id');
 
         if (!token || !guestId) {
-            console.log('❌ Skipping merge - missing token or guest_id');
+            console.log('âŒ Skipping merge - missing token or guest_id');
             console.log('  - Has token:', !!token);
             console.log('  - Has guest_id:', !!guestId);
             return;
@@ -281,9 +281,9 @@ export const syncLocalCartToBackend = async () => {
 
         // Dispatch event to show loading state
         window.dispatchEvent(new Event('cart-merging'));
-        console.log('📢 Dispatched cart-merging event (show loader)');
+        console.log('ðŸ“¢ Dispatched cart-merging event (show loader)');
 
-        console.log(`📦 Step 1: Fetching guest cart (${guestId})...`);
+        console.log(`ðŸ“¦ Step 1: Fetching guest cart (${guestId})...`);
 
         // Fetch guest cart WITHOUT token (to get guest items)
         const guestCartResponse = await axios.get('/api/v1/cart', {
@@ -298,16 +298,16 @@ export const syncLocalCartToBackend = async () => {
         });
 
         const guestCart = guestCartResponse.data?.cart || [];
-        console.log(`📦 Found ${guestCart.length} items in guest cart`);
+        console.log(`ðŸ“¦ Found ${guestCart.length} items in guest cart`);
 
         if (guestCart.length === 0) {
-            console.log('✅ No items to merge');
+            console.log('âœ… No items to merge');
             localStorage.removeItem('guest_id');
             return;
         }
 
         // Step 2: Add each item to user cart (WITH token)
-        console.log('📦 Step 2: Adding items to user cart...');
+        console.log('ðŸ“¦ Step 2: Adding items to user cart...');
         let itemsMerged = 0;
 
         for (const item of guestCart) {
@@ -348,16 +348,16 @@ export const syncLocalCartToBackend = async () => {
                 await axios.post('/api/v1/cart/add', itemData);
 
                 itemsMerged++;
-                console.log(`   ✅ Added successfully`);
+                console.log(`   âœ… Added successfully`);
             } catch (error: any) {
-                console.error(`   ❌ Failed to add item:`, error.message);
+                console.error(`   âŒ Failed to add item:`, error.message);
             }
         }
 
-        console.log(`✅ Successfully merged ${itemsMerged}/${guestCart.length} items`);
+        console.log(`âœ… Successfully merged ${itemsMerged}/${guestCart.length} items`);
 
         // Step 3: Clear guest cart
-        console.log('📦 Step 3: Clearing guest cart...');
+        console.log('ðŸ“¦ Step 3: Clearing guest cart...');
         try {
             await axios.delete('/api/v1/cart/clear', {
                 headers: {
@@ -368,20 +368,20 @@ export const syncLocalCartToBackend = async () => {
                     return data;
                 }]
             });
-            console.log('✅ Guest cart cleared');
+            console.log('âœ… Guest cart cleared');
         } catch (error: any) {
-            console.warn('⚠️  Failed to clear guest cart:', error.message);
+            console.warn('âš ï¸  Failed to clear guest cart:', error.message);
         }
 
         // Step 4: Cleanup
         localStorage.removeItem('guest_id');
-        console.log('🗑️  Removed guest_id from localStorage');
+        console.log('ðŸ—‘ï¸  Removed guest_id from localStorage');
 
         window.dispatchEvent(new Event('cart-updated'));
-        console.log('📢 Dispatched cart-updated event');
+        console.log('ðŸ“¢ Dispatched cart-updated event');
 
     } catch (error: any) {
-        console.error('❌ Cart merge failed:', error);
+        console.error('âŒ Cart merge failed:', error);
         console.error('  - Error:', error.message);
         console.error('  - Response:', error.response?.data);
         // Don't throw - cart sync is not critical for login flow
@@ -661,7 +661,7 @@ export const getProfile = () => {
 }
 
 export const updateProfile = (data: any) => {
-    console.log('📤 API: Sending profile update:', data);
+    console.log('ðŸ“¤ API: Sending profile update:', data);
 
     // Backend expects these exact field names (snake_case)
     const payload = {
@@ -685,15 +685,15 @@ export const updateProfile = (data: any) => {
         }
     });
 
-    console.log('📦 API: Cleaned payload:', payload);
+    console.log('ðŸ“¦ API: Cleaned payload:', payload);
 
     return axios.put('/api/v1/user/profile', payload)
         .then(response => {
-            console.log('✅ API: Success response:', response.data);
+            console.log('âœ… API: Success response:', response.data);
             return response;
         })
         .catch(error => {
-            console.error('❌ API: Error response:', error.response?.data || error);
+            console.error('âŒ API: Error response:', error.response?.data || error);
             throw error;
         });
 }
@@ -845,3 +845,185 @@ export const updateMyPrescriptionCartId = (
 export const deletePrescription = (id: string) => {
     return axios.delete(`/api/v1/user/prescriptions/${id}`);
 };
+
+
+
+
+
+// REAL: Get User Addresses (with localStorage fallback)
+export const getUserAddresses = () => {
+    // First try to get from API
+    return axios.get('/api/v1/user/addresses')
+        .then(response => {
+            if (response.data?.success) {
+                // Also store in localStorage for backup
+                localStorage.setItem('userAddresses', JSON.stringify(response.data.addresses || []));
+                return {
+                    data: {
+                        status: true,
+                        addresses: response.data.addresses || []
+                    }
+                };
+            }
+            // If API fails, try to get from localStorage
+            const storedAddresses = localStorage.getItem('userAddresses');
+            if (storedAddresses) {
+                return {
+                    data: {
+                        status: true,
+                        addresses: JSON.parse(storedAddresses)
+                    }
+                };
+            }
+            return { data: { status: false, addresses: [] } };
+        })
+        .catch(error => {
+            console.error("Error fetching addresses from API, trying localStorage:", error);
+            // Fallback to localStorage
+            const storedAddresses = localStorage.getItem('userAddresses');
+            if (storedAddresses) {
+                return {
+                    data: {
+                        status: true,
+                        addresses: JSON.parse(storedAddresses)
+                    }
+                };
+            }
+            return { data: { status: false, addresses: [] } };
+        });
+}
+
+// REAL: Save User Address (with localStorage backup)
+export const saveUserAddress = (addressData: any) => {
+    // Backend expects these exact field names
+    const payload = {
+        full_name: addressData.fullName,
+        email: addressData.email,
+        mobile: addressData.mobile,
+        address_line: addressData.addressLine,
+        city: addressData.city,
+        state: addressData.state,
+        country: addressData.country,
+        zip: addressData.zip,
+        address_type: addressData.addressType,
+        is_default: addressData.isDefaultAddress
+    };
+
+    // Try to save to API first
+    return axios.post('/api/v1/user/addresses', payload)
+        .then(response => {
+            if (response.data?.success) {
+                // Update localStorage
+                const storedAddresses = localStorage.getItem('userAddresses');
+                let addresses = storedAddresses ? JSON.parse(storedAddresses) : [];
+                
+                // If setting as default, remove default flag from others
+                if (addressData.isDefaultAddress) {
+                    addresses = addresses.map((addr: any) => ({ ...addr, is_default: false }));
+                }
+                
+                // Add or update the address
+                const existingIndex = addresses.findIndex((addr: any) => addr.id === response.data.address_id);
+                if (existingIndex >= 0) {
+                    addresses[existingIndex] = { ...payload, id: response.data.address_id };
+                } else {
+                    addresses.push({ ...payload, id: response.data.address_id || Date.now().toString() });
+                }
+                
+                localStorage.setItem('userAddresses', JSON.stringify(addresses));
+                
+                return {
+                    data: {
+                        status: true,
+                        address_id: response.data.address_id,
+                        message: response.data.message || "Address saved successfully"
+                    }
+                };
+            }
+            // Fallback: save to localStorage only
+            const storedAddresses = localStorage.getItem('userAddresses');
+            let addresses = storedAddresses ? JSON.parse(storedAddresses) : [];
+            
+            if (addressData.isDefaultAddress) {
+                addresses = addresses.map((addr: any) => ({ ...addr, is_default: false }));
+            }
+            
+            const newAddress = { ...payload, id: Date.now().toString() };
+            addresses.push(newAddress);
+            
+            localStorage.setItem('userAddresses', JSON.stringify(addresses));
+            
+            return {
+                data: {
+                    status: true,
+                    address_id: newAddress.id,
+                    message: "Address saved locally"
+                }
+            };
+        })
+        .catch(error => {
+            console.error("Error saving address to API, saving to localStorage:", error);
+            // Fallback: save to localStorage only
+            const storedAddresses = localStorage.getItem('userAddresses');
+            let addresses = storedAddresses ? JSON.parse(storedAddresses) : [];
+            
+            if (addressData.isDefaultAddress) {
+                addresses = addresses.map((addr: any) => ({ ...addr, is_default: false }));
+            }
+            
+            const newAddress = { ...payload, id: Date.now().toString() };
+            addresses.push(newAddress);
+            
+            localStorage.setItem('userAddresses', JSON.stringify(addresses));
+            
+            return {
+                data: {
+                    status: true,
+                    address_id: newAddress.id,
+                    message: "Address saved locally"
+                }
+            };
+        });
+}
+
+// REAL: Delete User Address (with localStorage sync)
+export const deleteUserAddress = (addressId: string) => {
+    return axios.delete(`/api/v1/user/addresses/${addressId}`)
+        .then(response => {
+            if (response.data?.success) {
+                // Update localStorage
+                const storedAddresses = localStorage.getItem('userAddresses');
+                let addresses = storedAddresses ? JSON.parse(storedAddresses) : [];
+                addresses = addresses.filter((addr: any) => addr.id !== addressId);
+                localStorage.setItem('userAddresses', JSON.stringify(addresses));
+                
+                return {
+                    data: {
+                        status: true,
+                        message: response.data.message || "Address deleted successfully"
+                    }
+                };
+            }
+            return {
+                data: {
+                    status: false,
+                    message: "Failed to delete address"
+                }
+            };
+        })
+        .catch(error => {
+            console.error("Error deleting address from API, updating localStorage:", error);
+            // Fallback: update localStorage only
+            const storedAddresses = localStorage.getItem('userAddresses');
+            let addresses = storedAddresses ? JSON.parse(storedAddresses) : [];
+            addresses = addresses.filter((addr: any) => addr.id !== addressId);
+            localStorage.setItem('userAddresses', JSON.stringify(addresses));
+            
+            return {
+                data: {
+                    status: true,
+                    message: "Address deleted locally"
+                }
+            };
+        });
+}
